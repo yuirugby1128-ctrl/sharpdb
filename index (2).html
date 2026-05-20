@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SharpDB — シャーペン データベース</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#0ea5e9;
+  --blue-d:#0284c7;
+  --blue-l:#e0f2fe;
+  --blue-xl:#f0f9ff;
+  --ink:#0f172a;
+  --ink2:#1e293b;
+  --ink3:#334155;
+  --mid:#64748b;
+  --muted:#94a3b8;
+  --line:#e2e8f0;
+  --surface:#f8fafc;
+  --white:#ffffff;
+  --red:#f43f5e;
+  --green:#22c55e;
+  --amber:#f59e0b;
+  --ease:.26s cubic-bezier(.4,0,.2,1);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Outfit',sans-serif;background:var(--surface);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* ── HEADER ── */
+.hdr{
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:200;
+}
+.hdr-in{max-width:1360px;margin:0 auto;padding:0 32px;display:flex;align-items:center;gap:20px;height:62px}
+.logo{display:flex;align-items:center;gap:10px;white-space:nowrap;text-decoration:none}
+.logo-icon{width:32px;height:32px;background:var(--ink);border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+.logo-icon svg{display:block}
+.logo-text{font-size:18px;font-weight:700;color:var(--ink);letter-spacing:-.025em}
+.logo-text span{color:var(--blue)}
+.srch-wrap{flex:1;max-width:500px;position:relative}
+.srch-wrap input{
+  width:100%;height:40px;
+  border:1.5px solid var(--line);
+  border-radius:12px;
+  padding:0 16px 0 42px;
+  font-size:13.5px;font-family:'Outfit',sans-serif;
+  background:var(--surface);color:var(--ink);
+  transition:var(--ease);outline:none;
+}
+.srch-wrap input:focus{border-color:var(--blue);background:var(--white);box-shadow:0 0 0 4px rgba(14,165,233,.1)}
+.srch-wrap input::placeholder{color:var(--muted)}
+.srch-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.hdr-stat{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.hdr-stat strong{color:var(--blue);font-weight:600}
+
+/* ── SHEET SETUP BANNER ── */
+.setup-banner{
+  background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+  color:white;
+  padding:12px 32px;
+  display:flex;align-items:center;gap:12px;font-size:13px;
+}
+.setup-banner.hidden{display:none}
+.setup-banner a{color:var(--blue);text-decoration:underline;text-underline-offset:2px}
+.setup-banner code{background:rgba(255,255,255,.12);padding:2px 8px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:11px}
+.setup-close{margin-left:auto;cursor:pointer;opacity:.5;background:none;border:none;color:white;font-size:18px;line-height:1;padding:0 4px}
+.setup-close:hover{opacity:1}
+
+/* ── MAIN ── */
+.main{max-width:1360px;margin:0 auto;padding:28px 32px 72px}
+
+/* ── PANELS ── */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:760px){.panels{grid-template-columns:1fr}}
+
+.pnl{background:var(--white);border-radius:20px;border:1px solid var(--line);overflow:hidden}
+.pnl-hdr{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 20px;cursor:pointer;user-select:none;
+  transition:background var(--ease);
+}
+.pnl-hdr:hover{background:var(--surface)}
+.pnl-hdr-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+.pnl-title{font-size:13.5px;font-weight:600;color:var(--ink2);flex:1;letter-spacing:-.01em}
+.pnl-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.03em}
+.pnl-chev{color:var(--muted);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.pnl-chev.open{transform:rotate(180deg)}
+.pnl-body{max-height:0;overflow:hidden;transition:max-height .38s cubic-bezier(.4,0,.2,1)}
+.pnl-body.open{max-height:600px}
+.pnl-inner{padding:2px 20px 18px;border-top:1px solid var(--line)}
+
+/* news panel */
+.pnl-hdr-icon.news{background:#eff6ff}
+.pnl-badge.news{background:var(--blue-l);color:var(--blue-d)}
+.news-status{display:flex;align-items:center;gap:8px;padding:12px 0 10px;font-size:12px;color:var(--muted)}
+.news-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.news-dot.loading{background:var(--amber);animation:pulse 1.2s ease infinite}
+.news-dot.done{background:var(--green)}
+.news-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.news-ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.news-li{font-size:13px;color:var(--ink3);display:flex;align-items:flex-start;gap:8px;line-height:1.55}
+.n-bullet{width:5px;height:5px;background:var(--blue);border-radius:50%;margin-top:7px;flex-shrink:0}
+.n-tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:5px;white-space:nowrap;vertical-align:middle}
+.n-tag.new{background:#dcfce7;color:#15803d}
+.n-tag.hot{background:#fee2e2;color:#b91c1c}
+.n-tag.info{background:#f0f9ff;color:var(--blue-d)}
+.news-error{font-size:12px;color:var(--red);padding:10px 0}
+.news-retry{background:none;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;margin-top:6px;font-family:'Outfit',sans-serif}
+
+/* fav panel */
+.pnl-hdr-icon.fav{background:#fff1f2}
+.pnl-badge.fav{background:#ffe4e6;color:#be123c}
+.fav-row{display:flex;align-items:baseline;justify-content:space-between;padding:12px 0 8px}
+.fav-lbl{font-size:12px;color:var(--mid)}
+.fav-total{font-size:26px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em}
+.fav-total span{font-size:12px;color:var(--mid);font-family:'Outfit',sans-serif;margin-right:2px}
+.fav-list{display:flex;flex-direction:column}
+.fav-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid var(--line);gap:8px}
+.fav-item-name{font-size:12px;color:var(--mid);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fav-item-price{font-size:12px;font-weight:500;color:var(--ink2);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.fav-empty{font-size:12px;color:var(--muted);text-align:center;padding:16px 0}
+
+/* ── SHEET SETTINGS ── */
+.sheet-bar{
+  background:var(--white);border:1px solid var(--line);border-radius:14px;
+  padding:14px 20px;margin-bottom:22px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.sheet-bar label{font-size:12px;font-weight:600;color:var(--mid);white-space:nowrap}
+.sheet-bar input{
+  flex:1;min-width:200px;height:36px;
+  border:1.5px solid var(--line);border-radius:9px;
+  padding:0 12px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  color:var(--ink);background:var(--surface);outline:none;transition:var(--ease);
+}
+.sheet-bar input:focus{border-color:var(--blue);background:var(--white)}
+.sheet-bar input::placeholder{font-family:'Outfit',sans-serif;color:var(--muted);font-size:12px}
+.btn-load{
+  height:36px;padding:0 18px;background:var(--blue);color:white;
+  border:none;border-radius:9px;font-size:13px;font-weight:600;font-family:'Outfit',sans-serif;
+  cursor:pointer;transition:var(--ease);white-space:nowrap;flex-shrink:0;
+}
+.btn-load:hover{background:var(--blue-d)}
+.sheet-status{font-size:11.5px;font-family:'JetBrains Mono',monospace}
+.sheet-status.ok{color:var(--green)}
+.sheet-status.err{color:var(--red)}
+.sheet-status.loading{color:var(--amber)}
+
+/* ── TAGS ── */
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tag{
+  height:32px;padding:0 16px;border-radius:30px;
+  font-size:12.5px;font-weight:500;
+  border:1.5px solid var(--line);background:var(--white);color:var(--mid);
+  cursor:pointer;transition:var(--ease);white-space:nowrap;
+}
+.tag:hover{border-color:var(--blue);color:var(--blue)}
+.tag.active{background:var(--ink);color:var(--white);border-color:var(--ink)}
+
+/* ── RESULTS BAR ── */
+.rbar{display:flex;align-items:center;margin-bottom:16px;gap:12px}
+.rbar-count{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.rbar-count strong{color:var(--ink2);font-weight:600}
+
+/* ── GRID ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+@media(max-width:580px){.grid{grid-template-columns:1fr}}
+
+/* ── CARD ── */
+.card{
+  background:var(--white);
+  border-radius:20px;
+  border:1px solid var(--line);
+  padding:20px;
+  display:flex;flex-direction:column;gap:12px;
+  transition:transform var(--ease), box-shadow var(--ease), border-color var(--ease);
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--blue),#38bdf8);
+  opacity:0;transition:opacity var(--ease);
+}
+.card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(14,165,233,.1),0 4px 12px rgba(0,0,0,.06);border-color:rgba(14,165,233,.2)}
+.card:hover::before{opacity:1}
+
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.card-brand{font-size:10.5px;font-weight:700;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
+.card-name{font-size:16px;font-weight:700;color:var(--ink);line-height:1.25;letter-spacing:-.02em}
+.card-fav{
+  width:34px;height:34px;border-radius:50%;
+  background:transparent;border:1.5px solid var(--line);
+  display:grid;place-items:center;cursor:pointer;
+  color:var(--muted);transition:var(--ease);flex-shrink:0;
+}
+.card-fav:hover{border-color:var(--red);color:var(--red);background:#fff1f2}
+.card-fav.on{border-color:var(--red);color:var(--red);background:#fff1f2}
+
+.card-chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;letter-spacing:.02em}
+.chip.mm{background:var(--blue-l);color:var(--blue-d)}
+.chip.normal{background:var(--surface);color:var(--mid)}
+.chip.lux{background:#fef3c7;color:#92400e}
+
+.card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line)}
+.card-price{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.card-price-sym{font-size:11px;color:var(--muted);margin-right:1px;font-weight:400}
+.card-desc{font-size:11.5px;color:var(--muted);text-align:right;max-width:120px;line-height:1.35}
+.card-link{display:block;font-size:11.5px;color:var(--blue);font-weight:500;text-align:right;margin-top:2px;transition:var(--ease)}
+.card-link:hover{color:var(--blue-d);text-decoration:underline;text-underline-offset:2px}
+
+/* ── EMPTY / LOADING ── */
+.grid-msg{grid-column:1/-1;text-align:center;padding:80px 0;color:var(--muted)}
+.grid-msg-icon{font-size:36px;margin-bottom:10px}
+.grid-msg p{font-size:14px}
+
+/* ── RESPONSIVE ── */
+@media(max-width:640px){
+  .hdr-in{flex-wrap:wrap;height:auto;padding:10px 16px;gap:8px}
+  .srch-wrap{flex-basis:100%;max-width:100%;order:3}
+  .hdr-stat{display:none}
+  .main{padding:16px 16px 48px}
+  .setup-banner{padding:10px 16px;font-size:12px}
+  .sheet-bar{gap:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-in">
+    <a class="logo" href="#">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="8" y="2" width="3" height="10" rx="1.5" fill="white"/>
+          <rect x="7.5" y="12" width="4" height="2" rx=".5" fill="#94a3b8"/>
+          <polygon points="9,15 8,17 10,17" fill="#94a3b8"/>
+          <circle cx="9.5" cy="3.5" r="1.5" fill="#0ea5e9"/>
+        </svg>
+      </div>
+      <span class="logo-text">Sharp<span>DB</span></span>
+    </a>
+    <div class="srch-wrap">
+      <svg class="srch-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="srchIn" placeholder="ブランド・品名・特徴で検索…" autocomplete="off">
+    </div>
+    <div class="hdr-stat"><strong id="totNum">—</strong> 件収録</div>
+  </div>
+</header>
+
+<!-- SETUP BANNER -->
+<div class="setup-banner hidden" id="setupBanner">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+  <span>スプレッドシートのURLを下の入力欄に貼り付けてください。設定方法は <a href="#sheet-setup-guide" onclick="document.getElementById('sheetGuide').open=true">こちら</a> を参照。</span>
+  <button class="setup-close" onclick="document.getElementById('setupBanner').classList.add('hidden')">✕</button>
+</div>
+
+<main class="main">
+
+  <!-- PANELS -->
+  <div class="panels">
+
+    <!-- NEWS PANEL — Claude API powered -->
+    <div class="pnl">
+      <div class="pnl-hdr" onclick="togglePanel('news')">
+        <div class="pnl-hdr-icon news">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 0-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>
+        </div>
+        <span class="pnl-title">最新情報</span>
+        <span class="pnl-badge news">AI検索</span>
+        <svg class="pnl-chev open" id="newsChev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="pnl-body open" id="newsBody">
+        <div class="pnl-inner">
+          <div class="news-status" id="newsStatus">
+            <span class="news-dot loading" id="newsDot"></span>
+            <span id="newsStatusTxt">最新情報を取得中…</span>
+          </div>
+          <ul class="news-ul" id="newsUl"></ul>
+          <div id="newsError" style="display:none">
+            <div class="news-error" id="newsErrorTxt"></div>
+            <button class="news-retry" onclick="fetchNews()">再取得</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAV PANEL -->
+    <div class="pnl">
+      <div class="pnl-hdr" onclick="togglePanel('fav')">
+        <div class="pnl-hdr-icon fav">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <span class="pnl-title">お気に入り合計金額</span>
+        <svg class="pnl-chev" id="favChev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="pnl-body" id="favBody">
+        <div class="pnl-inner">
+          <div class="fav-row">
+            <span class="fav-lbl">登録アイテム合計</span>
+            <span class="fav-total"><span>¥</span><span id="favTotalNum">0</span></span>
+          </div>
+          <div id="favList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TAGS -->
+  <div class="tags" id="tagBar">
+    <div class="tag active" data-tag="ALL">すべて</div>
+    <div class="tag" data-tag="0.3">0.3mm</div>
+    <div class="tag" data-tag="0.5">0.5mm</div>
+    <div class="tag" data-tag="0.7">0.7mm</div>
+    <div class="tag" data-tag="低重心">低重心</div>
+    <div class="tag" data-tag="木軸">木軸</div>
+    <div class="tag" data-tag="高級">高級 ¥5000+</div>
+    <div class="tag" data-tag="製図">製図用</div>
+    <div class="tag" data-tag="回転機構">回転機構</div>
+    <div class="tag" data-tag="ノック不要">ノック不要</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="rbar">
+    <div class="rbar-count"><strong id="resCnt">0</strong> 件表示</div>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="grid-msg">
+      <div class="grid-msg-icon">📋</div>
+      <p>上のURLからスプレッドシートを読み込んでください</p>
+    </div>
+  </div>
+</main>
+
+<!-- GUIDE DIALOG -->
+<details id="sheetGuide" style="display:none">
+  <summary></summary>
+</details>
+
+<script>
+/* =====================================================
+   STATE
+===================================================== */
+let DB = [];
+let favs = JSON.parse(localStorage.getItem('sharpdb_favs3') || '[]');
+let activeTag = 'ALL';
+let searchQ = '';
+let panelOpen = {news: true, fav: false};
+
+/* =====================================================
+   PANELS
+===================================================== */
+function togglePanel(id) {
+  panelOpen[id] = !panelOpen[id];
+  document.getElementById(id + 'Body').classList.toggle('open', panelOpen[id]);
+  document.getElementById(id + 'Chev').classList.toggle('open', panelOpen[id]);
+}
+
+/* =====================================================
+   CLAUDE API — NEWS (web_search tool enabled)
+===================================================== */
+async function fetchNews() {
+  const dot = document.getElementById('newsDot');
+  const txt = document.getElementById('newsStatusTxt');
+  const ul  = document.getElementById('newsUl');
+  const errDiv = document.getElementById('newsError');
+  const errTxt = document.getElementById('newsErrorTxt');
+
+  dot.className = 'news-dot loading';
+  txt.textContent = '最新情報を取得中…';
+  ul.innerHTML = '';
+  errDiv.style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: `あなたは日本の文房具専門アシスタントです。web_searchツールを使って日本のシャーペンの最新情報を検索し、以下のJSON形式のみで返してください。他のテキストは一切不要です。
+{"items":[{"text":"情報テキスト","tag":"NEW"}]}
+tagはNEW（新発売）、HOT（注目）、INFO（その他）のいずれか。itemsは3〜5件。検索結果に基づいた事実のみ記載。`,
+        messages: [{
+          role: 'user',
+          content: '日本のシャーペン最新情報を検索してください。新製品・限定品・人気モデルの動向など。'
+        }]
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    // Handle both direct text and tool_use responses
+    let items = [];
+    const textBlocks = (data.content || []).filter(b => b.type === 'text' && b.text && b.text.includes('{'));
+    if (textBlocks.length) {
+      const jsonMatch = textBlocks.map(b => b.text).join('').match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        items = parsed.items || [];
+      }
+    }
+
+    if (!items.length) throw new Error('情報を取得できませんでした');
+
+    ul.innerHTML = items.map(item => `
+      <li class="news-li">
+        <span class="n-bullet"></span>
+        <span>${escHtml(item.text)}<span class="n-tag ${(item.tag||'INFO').toLowerCase()}">${item.tag||'INFO'}</span></span>
+      </li>
+    `).join('');
+
+    dot.className = 'news-dot done';
+    txt.textContent = '取得完了 — ' + new Date().toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+
+  } catch (e) {
+    dot.className = 'news-dot error';
+    txt.textContent = '取得失敗';
+    errTxt.textContent = e.message;
+    errDiv.style.display = 'block';
+    console.error('News fetch error:', e);
+  }
+}
+
+/* =====================================================
+   GOOGLE SHEETS LOADER
+   シートをCSVとして公開する手順:
+   1. スプレッドシートを開く
+   2. ファイル → 共有 → ウェブに公開
+   3. 「シート1」→「カンマ区切りの値（.csv）」を選択して公開
+   4. 表示されたURLをここに貼り付ける
+===================================================== */
+async function loadSheet() {
+  const urlInput = document.getElementById('sheetUrl');
+  const statusEl = document.getElementById('sheetStatus');
+  let url = urlInput.value.trim();
+
+  if (!url) { setSheetStatus('URLを入力してください', 'err'); return; }
+
+  // Convert normal sheet URL to CSV export URL if needed
+  // Supports: /spreadsheets/d/ID/edit and /spreadsheets/d/ID/pub (CSV)
+  const idMatch = url.match(/\/spreadsheets\/d\/([\w-]+)/);
+  if (idMatch) {
+    const id = idMatch[1];
+    // Check if it's already a pub CSV url
+    if (!url.includes('/pub') || !url.includes('output=csv')) {
+      url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=products`;
+    }
+  }
+
+  setSheetStatus('読み込み中…', 'loading');
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    if (rows.length < 2) throw new Error('データが空です');
+
+    // Auto-detect header — Japanese and English both OK
+    const header = rows[0].map(h => h.trim());
+    const col = (...names) => {
+      for (const n of names) {
+        const i = header.findIndex(h => h === n || h.toLowerCase() === n.toLowerCase());
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+
+    const cBrand    = col('ブランド', 'brand');
+    const cName     = col('製品名', 'name');
+    const cMm       = col('芯径', 'mm');
+    const cPrice    = col('価格', 'price');
+    const cTags     = col('タグ', 'tags');
+    const cDesc     = col('説明', 'desc');
+    const cColor    = col('カラー', 'color');
+    const cMaterial = col('軸素材', 'material');
+    const cLink     = col('リンク', 'url', 'link');
+
+    if (cBrand < 0 || cName < 0) throw new Error('「ブランド」「製品名」列が見つかりません');
+
+    DB = rows.slice(1)
+      .filter(r => r.some(c => c.trim()))
+      .map(r => ({
+        brand:    r[cBrand]    || '',
+        name:     r[cName]     || '',
+        mm:       cMm       >= 0 ? (r[cMm]||'').trim()   : '',
+        price:    cPrice    >= 0 ? Number((r[cPrice]||'').replace(/[^\d.]/g,'')) || 0 : 0,
+        tags:     cTags     >= 0 ? (r[cTags]||'').split(/[,、]/).map(t=>t.trim()).filter(Boolean) : [],
+        desc:     cDesc     >= 0 ? (r[cDesc]     || '') : '',
+        color:    cColor    >= 0 ? (r[cColor]    || '') : '',
+        material: cMaterial >= 0 ? (r[cMaterial] || '') : '',
+        link:     cLink     >= 0 ? (r[cLink]     || '') : '',
+      }));
+
+    localStorage.setItem('sharpdb_sheetUrl', urlInput.value.trim());
+    document.getElementById('totNum').textContent = DB.length;
+    setSheetStatus(`✓ ${DB.length}件読み込み完了`, 'ok');
+    document.getElementById('setupBanner').classList.add('hidden');
+    renderGrid();
+
+  } catch (e) {
+    setSheetStatus('読み込み失敗: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+
+function setSheetStatus(msg, cls) {
+  const el = document.getElementById('sheetStatus');
+  el.textContent = msg;
+  el.className = 'sheet-status ' + cls;
+}
+
+/* Minimal CSV parser (handles quoted fields) */
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        cols.push(cur); cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    cols.push(cur);
+    rows.push(cols);
+  }
+  return rows;
+}
+
+/* =====================================================
+   FAVORITES
+===================================================== */
+function saveFavs() { localStorage.setItem('sharpdb_favs3', JSON.stringify(favs)); }
+
+function toggleFav(i) {
+  const idx = favs.indexOf(i);
+  if (idx >= 0) favs.splice(idx, 1); else favs.push(i);
+  saveFavs();
+  renderFavPanel();
+  const btn = document.querySelector(`[data-fi="${i}"]`);
+  if (btn) {
+    const on = favs.includes(i);
+    btn.classList.toggle('on', on);
+    btn.innerHTML = heartSvg(on);
+  }
+}
+
+function renderFavPanel() {
+  const items = DB.filter((_, i) => favs.includes(i));
+  const total = items.reduce((s, p) => s + (p.price || 0), 0);
+  document.getElementById('favTotalNum').textContent = total.toLocaleString('ja-JP');
+  const el = document.getElementById('favList');
+  if (!items.length) { el.innerHTML = '<div class="fav-empty">お気に入り未登録</div>'; return; }
+  el.innerHTML = items.map(p =>
+    `<div class="fav-item">
+      <span class="fav-item-name">${escHtml(p.brand)} ${escHtml(p.name)}${p.mm?' '+p.mm+'mm':''}</span>
+      <span class="fav-item-price">¥${(p.price||0).toLocaleString()}</span>
+    </div>`
+  ).join('');
+}
+
+/* =====================================================
+   FILTER + RENDER
+===================================================== */
+function filtered() {
+  const lq = searchQ.toLowerCase();
+  return DB.map((p, i) => ({...p, _i: i})).filter(p => {
+    const matchTag =
+      activeTag === 'ALL' ? true :
+      activeTag === '高級' ? p.price >= 5000 :
+      p.tags.includes(activeTag) || p.mm === activeTag;
+    const matchQ = !lq || `${p.brand} ${p.name} ${p.mm} ${p.desc} ${p.tags.join(' ')}`.toLowerCase().includes(lq);
+    return matchTag && matchQ;
+  });
+}
+
+function renderGrid() {
+  const items = filtered();
+  document.getElementById('resCnt').textContent = items.length;
+  const g = document.getElementById('grid');
+
+  if (!DB.length) {
+    g.innerHTML = `<div class="grid-msg"><div class="grid-msg-icon">📋</div><p>上のURLからスプレッドシートを読み込んでください</p></div>`;
+    return;
+  }
+  if (!items.length) {
+    g.innerHTML = `<div class="grid-msg"><div class="grid-msg-icon">🔍</div><p>条件に合うシャーペンが見つかりませんでした</p></div>`;
+    return;
+  }
+
+  g.innerHTML = items.map(p => {
+    const on = favs.includes(p._i);
+    const isLux = p.price >= 5000;
+    const otherTags = p.tags.filter(t => t !== p.mm && !['0.3','0.5','0.7','0.9','高級'].includes(t));
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-brand">${escHtml(p.brand)}</div>
+          <div class="card-name">${escHtml(p.name)}</div>
+        </div>
+        <button class="card-fav${on?' on':''}" data-fi="${p._i}" onclick="toggleFav(${p._i})" aria-label="お気に入り">${heartSvg(on)}</button>
+      </div>
+      <div class="card-chips">
+        ${p.mm ? `<span class="chip mm">${p.mm}mm</span>` : ''}
+        ${p.color ? `<span class="chip normal">${escHtml(p.color)}</span>` : ''}
+        ${p.material ? `<span class="chip normal">${escHtml(p.material)}</span>` : ''}
+        ${otherTags.map(t => `<span class="chip normal">${escHtml(t)}</span>`).join('')}
+        ${isLux ? '<span class="chip lux">高級</span>' : ''}
+      </div>
+      <div class="card-footer">
+        <div class="card-price"><span class="card-price-sym">¥</span>${(p.price||0).toLocaleString()}</div>
+        <div class="card-desc">${escHtml(p.desc)}</div>
+      </div>
+      ${p.link ? `<a href="${escHtml(p.link)}" target="_blank" rel="noopener" class="card-link">公式ページを見る →</a>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* =====================================================
+   UTILS
+===================================================== */
+function heartSvg(on) {
+  return on
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="#f43f5e" stroke="#f43f5e" stroke-width="0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* =====================================================
+   EVENTS
+===================================================== */
+document.getElementById('srchIn').addEventListener('input', e => {
+  searchQ = e.target.value;
+  renderGrid();
+});
+
+document.getElementById('tagBar').addEventListener('click', e => {
+  const t = e.target.closest('.tag');
+  if (!t) return;
+  document.querySelectorAll('.tag').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  activeTag = t.dataset.tag;
+  renderGrid();
+});
+
+/* Fixed sheet URL — auto-load on every page open */
+const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSX6gI0jTPEae-VBLzF5v3fUcb391WrC6L0TGlnrCuUAGsmmXGL50ayDkdAnR5DOcsPdo8GbYGSfO6p/pub?gid=0&single=true&output=csv';
+document.getElementById('sheetUrl').value = SHEET_CSV;
+loadSheet();
+
+/* =====================================================
+   INIT
+===================================================== */
+fetchNews();
+renderFavPanel();
+</script>
+
+<!-- SETUP GUIDE (hidden details used as a tooltip target) -->
+<details id="sheetGuide" style="position:fixed;bottom:24px;right:24px;z-index:300;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.12);font-size:13px;line-height:1.7">
+  <summary style="font-weight:700;font-size:14px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    スプレッドシート設定ガイド
+    <span style="margin-left:auto;color:var(--muted)">✕</span>
+  </summary>
+  <div style="margin-top:12px;color:var(--ink3)">
+    <p style="font-weight:600;margin-bottom:6px">スプレッドシートの列構成（1行目はヘッダー）</p>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:'JetBrains Mono',monospace">
+      <tr style="background:var(--surface)"><th style="padding:4px 8px;text-align:left;border:1px solid var(--line)">列名</th><th style="padding:4px 8px;text-align:left;border:1px solid var(--line)">内容</th><th style="padding:4px 8px;border:1px solid var(--line)">必須</th></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">brand</td><td style="padding:4px 8px;border:1px solid var(--line)">ブランド名</td><td style="padding:4px 8px;border:1px solid var(--line);text-align:center">✓</td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">name</td><td style="padding:4px 8px;border:1px solid var(--line)">製品名</td><td style="padding:4px 8px;border:1px solid var(--line);text-align:center">✓</td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">mm</td><td style="padding:4px 8px;border:1px solid var(--line)">芯径（0.5 など）</td><td style="padding:4px 8px;border:1px solid var(--line)"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">price</td><td style="padding:4px 8px;border:1px solid var(--line)">税込価格（数字）</td><td style="padding:4px 8px;border:1px solid var(--line)"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">tags</td><td style="padding:4px 8px;border:1px solid var(--line)">タグ（カンマ区切り）</td><td style="padding:4px 8px;border:1px solid var(--line)"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid var(--line)">desc</td><td style="padding:4px 8px;border:1px solid var(--line)">説明文</td><td style="padding:4px 8px;border:1px solid var(--line)"></td></tr>
+    </table>
+    <p style="margin-top:12px;font-weight:600;margin-bottom:4px">URLの取得方法</p>
+    <ol style="padding-left:16px;font-size:12px;color:var(--mid)">
+      <li>Googleスプレッドシートを開く</li>
+      <li>ファイル → 共有 → ウェブに公開</li>
+      <li>「シート1」→「カンマ区切り（.csv）」を選択</li>
+      <li>「公開」→ 表示されたURLをコピー</li>
+    </ol>
+  </div>
+</details>
+
+</body>
+</html>
