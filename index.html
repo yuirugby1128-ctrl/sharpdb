@@ -442,25 +442,9 @@ tagはNEW（新発売）、HOT（注目）、INFO（その他）のいずれか�
    3. 「シート1」→「カンマ区切りの値（.csv）」を選択して公開
    4. 表示されたURLをここに貼り付ける
 ===================================================== */
-async function loadSheet() {
-  const urlInput = document.getElementById('sheetUrl');
+async function loadSheetFromUrl(url) {
   const statusEl = document.getElementById('sheetStatus');
-  let url = urlInput.value.trim();
-
-  if (!url) { setSheetStatus('URLを入力してください', 'err'); return; }
-
-  // Convert normal sheet URL to CSV export URL if needed
-  // Supports: /spreadsheets/d/ID/edit and /spreadsheets/d/ID/pub (CSV)
-  const idMatch = url.match(/\/spreadsheets\/d\/([\w-]+)/);
-  if (idMatch) {
-    const id = idMatch[1];
-    // Check if it's already a pub CSV url
-    if (!url.includes('/pub') || !url.includes('output=csv')) {
-      url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=products`;
-    }
-  }
-
-  setSheetStatus('読み込み中…', 'loading');
+  if (statusEl) setSheetStatus('読み込み中…', 'loading');
 
   try {
     const res = await fetch(url);
@@ -506,14 +490,14 @@ async function loadSheet() {
         link:     cLink     >= 0 ? (r[cLink]     || '') : '',
       }));
 
-    localStorage.setItem('sharpdb_sheetUrl', urlInput.value.trim());
+    
     document.getElementById('totNum').textContent = DB.length;
-    setSheetStatus(`✓ ${DB.length}件読み込み完了`, 'ok');
+    if(document.getElementById('sheetStatus')) setSheetStatus(`✓ ${DB.length}件読み込み完了`, 'ok');
     document.getElementById('setupBanner').classList.add('hidden');
     renderGrid();
 
   } catch (e) {
-    setSheetStatus('読み込み失敗: ' + e.message, 'err');
+    if(document.getElementById('sheetStatus')) setSheetStatus('読み込み失敗: ' + e.message, 'err'); console.error('Sheet load error:', e);
     console.error(e);
   }
 }
@@ -670,8 +654,7 @@ document.getElementById('tagBar').addEventListener('click', e => {
 
 /* Fixed sheet URL — auto-load on every page open */
 const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSX6gI0jTPEae-VBLzF5v3fUcb391WrC6L0TGlnrCuUAGsmmXGL50ayDkdAnR5DOcsPdo8GbYGSfO6p/pub?gid=0&single=true&output=csv';
-document.getElementById('sheetUrl').value = SHEET_CSV;
-loadSheet();
+loadSheetFromUrl(SHEET_CSV);
 
 /* =====================================================
    INIT
